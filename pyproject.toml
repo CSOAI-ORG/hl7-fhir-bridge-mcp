@@ -1,0 +1,19 @@
+[project]
+name = "hl7-fhir-bridge-mcp"
+version = "0.1.0"
+description = "HL7 v2 / FHIR healthcare-messaging bridge to ONE OS / CSOAI — parse, map HL7v2->FHIR, validate, govern PHI (HIPAA/MDR). CSOAI Layer-0 legacy-bridge family."
+readme = "README.md"
+requires-python = ">=3.10"
+license = {text = "MIT"}
+authors = [{name = "CSOAI-ORG"}]
+dependencies = ["mcp>=1.0.0", "pydantic>=2.0.0"]
+
+[project.scripts]
+hl7-fhir-bridge-mcp = "server:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+only-include = ["server.py"]
