@@ -8,7 +8,7 @@ EU AI Act Annex I). Sibling of cobol-bridge-mcp.
 
 Tools: parse_hl7v2 · hl7_to_fhir · validate_fhir · govern_phi
 """
-from mcp.server.fastmcp import FastMCP
+from mcp.server.mcpserver import MCPServer as FastMCP  # mcp 2.x: FastMCP renamed MCPServer
 from pydantic import BaseModel, Field
 from typing import List, Dict, Any, Optional
 import json
@@ -169,6 +169,37 @@ def govern_phi(message_or_fhir: str) -> PHIGovernance:
         frameworks=["HIPAA", "EU MDR/IVDR", "EU AI Act Art. 6(1)/Annex I", "GDPR Art. 9 (health data)"],
         minimisation_advice="Strip identifiers not required downstream; pseudonymise where possible; log access.",
         attestable=True,
+    )
+
+
+# ---------------------------------------------------------------------------
+# MCP 2026-07-28 wire - header-add migration (2026-10-08)
+# ---------------------------------------------------------------------------
+# stdio carries no HTTP headers, so Mcp-Method / Mcp-Name are not applicable to
+# this transport at runtime. When hl7-fhir-bridge-mcp is exposed over HTTP, route the ingress
+# through the vendored mcp2026_shim (ShimASGI): it validates Mcp-Method /
+# Mcp-Name, injects params._meta.protocolVersion = "2026-07-28" into every
+# request, strips Mcp-Session-Id and answers legacy initialize / server-discover
+# locally (the session header is never emitted - stateless wire).
+# Refs: MIGRATION_NOTE.md, MCP_2026_WIRE_MIGRATION_PLAN_2026-10-07.md (3) + (4).
+# ---------------------------------------------------------------------------
+
+
+def http_app():
+    """ASGI app for HTTP exposure, wrapped in the 2026-07-28 wire shim.
+
+    stdio (``mcp.run()``) needs no shim; this is the enable path once the
+    server is fronted by an HTTP transport. Bodies are buffered, so responses
+    are requested in JSON mode rather than SSE.
+    """
+    from mcp2026_shim import WIRE_2026, ShimASGI, ShimConfig
+
+    return ShimASGI(
+        mcp.streamable_http_app(json_response=True),
+        ShimConfig(
+            protocol_version=WIRE_2026,
+            server_info={"name": "hl7-fhir-bridge-mcp", "version": "0.1.0"},
+        ),
     )
 
 
